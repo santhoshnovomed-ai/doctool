@@ -1,0 +1,82 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flask==3.0.3
+          pip install pywebview==5.1
+          pip install defusedxml
+          pip install pillow
+          pip install docx2pdf
+          pip install pywin32
+          pip install pyinstaller==6.9.0
+
+      - name: Generate embedded assets
+        run: python build_assets.py
+
+      - name: Build EXE
+        run: >
+          pyinstaller
+          --onefile
+          --windowed
+          --name "Serena_Doc_Tool"
+          --hidden-import="webview"
+          --hidden-import="webview.platforms.edgechromium"
+          --hidden-import="webview.platforms.winforms"
+          --hidden-import="flask"
+          --hidden-import="flask.templating"
+          --hidden-import="jinja2"
+          --hidden-import="jinja2.ext"
+          --hidden-import="werkzeug"
+          --hidden-import="werkzeug.serving"
+          --hidden-import="defusedxml"
+          --hidden-import="defusedxml.minidom"
+          --hidden-import="PIL"
+          --hidden-import="PIL.Image"
+          --hidden-import="docx2pdf"
+          --hidden-import="win32com"
+          --hidden-import="win32com.client"
+          --hidden-import="pythoncom"
+          --hidden-import="pywintypes"
+          --hidden-import="_assets"
+          --collect-all="webview"
+          --collect-all="flask"
+          --collect-all="jinja2"
+          --collect-all="werkzeug"
+          app.py
+
+      - name: Confirm EXE built
+        shell: pwsh
+        run: |
+          $exe = "dist\Serena_Doc_Tool.exe"
+          if (Test-Path $exe) {
+            $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+            Write-Host "SUCCESS: $exe ($mb MB)"
+          } else {
+            Write-Error "FAILED: EXE not found"
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Serena_Doc_Tool_Windows
+          path: dist\Serena_Doc_Tool.exe
+          retention-days: 90
